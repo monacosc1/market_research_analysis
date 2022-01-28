@@ -1,0 +1,460 @@
+---
+title: "State of the U.S. Labor Market: January 2022"
+author: "Scott Monaco"
+date: "1/27/2022"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+  html_document:
+    code_folding: show
+    highlight: haddock
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+urlcolor: blue
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 4)
+if(!require("pacman")) install.packages("pacman")
+pacman::p_load(data.table, ggplot2, dplyr, tidyr, quantmod, ggrepel, 
+               reshape2, readxl, scales, gghighlight)
+```
+
+```{r echo=FALSE, warning=FALSE}
+# load fonts
+source('~/python_scripts/git/market_research_jan_2022/theme/wharton_theme.R')
+```
+
+```{r echo=FALSE, warning=FALSE}
+# load function
+dtfmt <- function(x){
+  parts = strsplit(x, ':')
+  # print(parts)
+  # print(paste0("20", parts[[1]][1], ' ', parts[[1]][2]))
+  return(as.yearqtr(paste0("20", parts[[1]][1], ' ', parts[[1]][2])))
+}
+```
+
+\pagebreak
+
+# Summary of the U.S. Labor Market 
+
+Americans returned to the road, skies and stadiums this quarter as the U.S. economy exceeded its pre-pandemic size. But lately, the great reopening has lost some momentum.
+
+Widespread business reopenings, rising vaccination rates and a big infusion of government pandemic aid this spring helped propel rapid gains in small business recovery - the economy’s main driver. But that burst of economic growth is starting to slow, particularly for services-based industries and tourist destinations, amid continued supply constraints, a shortage of available workers and the spread of the new Omicron variant. Initial unemployment claims had dipped below the 2019 average level during the Fall, only to reverse course in early January. 
+
+```{r, results = TRUE, echo = FALSE, warning=FALSE}
+# initial claims
+getSymbols.FRED("ICSA", env = .GlobalEnv) 
+
+ueclaims <- as.data.frame(ICSA)
+ueclaims$dt <- as.Date(row.names(ueclaims))
+
+avg_2019 <- ueclaims%>%filter(dt>='2019-01-01', dt<='2019-12-31')
+avg_2019 <- mean(avg_2019$ICSA)
+
+line.data <- data.frame(yintercept = avg_2019, Lines = c("2019 Average"))
+ggplot(ueclaims%>%filter(dt>='2021-01-01'), aes(x=dt, y=ICSA, group=1)) +
+  geom_area(fill=wharton_palette[1]) +
+  labs(
+    title = "Weekly Initial Unemployment Claims"
+    , x = "Week, Ending Saturday"
+    , y = "Insured Unemployment, Seasonally Adjusted"
+    , caption = "Data:U.S. Employment and Training Administration, Initial Claims [ICSA]"
+  ) +
+  scale_y_continuous(labels=comma) +
+  wharton_theme +
+  geom_hline(aes(yintercept = yintercept, linetype = Lines), line.data)
+addlogo()
+
+```
+
+Driving these numbers are the almost 8.8 million adults in the U.S. in early January said they couldn’t work because they were sick with or taking care of someone sick with Covid-19, according to a Census Bureau survey. That is by far the highest such figure in the “household pulse” survey, exceeding 6.6 million recorded last January.
+
+## Job Openings
+
+The U.S. as a whole lost more than 22 million jobs from the pandemic and at the end of 2021 still had 3.6 million fewer positions than in February 2020. The recent surge in Covid-19 cases due to the Omicron variant slowed job growth last month, but the labor market is still tight with employers struggling to hire for the 11 million job openings currently available amid a shortage of workers. Compounding labor shortages were the 4.5 million worker resignations resulting in the highest quit rate on record, particularly in hard-hit sectors such as retail and hospitality where labor shortages have forced businesses to close or shorten hours.
+
+With millions of people quitting work entirely, the labor-force participation rate dropped 61.9% in December - 1.5 points below the pre-pandemic level, and barely changed since August 2020. Overall labor-force participation peaked in 2000 at about 67%. if the U.S. maintained its employment-to-population ratio from 2000, we’d have more than 13 million more workers today. That would be more than enough to fill the record number of open jobs.
+
+Manufacturing, mining and accommodation & food services have seen among the fastest growth in job openings since January 2020. These are typically labor-intensive jobs, and these fields were much slower to add new openings before the pandemic. Demand for workers is cooling in professional and business services, which were some of the hottest hiring fields before the pandemic.
+
+
+```{r, results = TRUE, echo = FALSE, warning=FALSE}
+# job openings (industry level)
+getSymbols.FRED(c('JTSJOL','JTS3000JOL','JTS7000JOL','JTS7200JOL','JTS540099JOL'
+                  ,'JTS6000JOL','JTS2300JOL', 'JTS4000JOL', 'JTS4400JOL',
+                  'JTU4200JOL','JTU110099JOL'), env = .GlobalEnv)
+
+national <- as.data.frame(JTSJOL) %>% rename(openings = JTSJOL)
+national$dt <- as.Date(row.names(national))
+national$desc <- 'All Industries'
+
+manufacturing <- as.data.frame(JTS3000JOL) %>% rename(openings = JTS3000JOL)
+manufacturing$dt <- as.Date(row.names(manufacturing))
+manufacturing$desc <- 'Manufacturing'
+
+leisure_hosp <- as.data.frame(JTS7000JOL) %>% rename(openings = JTS7000JOL)
+leisure_hosp$dt <- as.Date(row.names(leisure_hosp))
+leisure_hosp$desc <- 'Leisure and Hospitality'
+
+accommodation_food <- as.data.frame(JTS7200JOL) %>% rename(openings = JTS7200JOL)
+accommodation_food$dt <- as.Date(row.names(accommodation_food))
+accommodation_food$desc <- 'Accommodation and Food Services'
+
+prof_biz_services <- as.data.frame(JTS540099JOL) %>% rename(openings = JTS540099JOL)
+prof_biz_services$dt <- as.Date(row.names(prof_biz_services))
+prof_biz_services$desc <- 'Professional and Business Services'
+
+educ_health_serv <- as.data.frame(JTS6000JOL) %>% rename(openings = JTS6000JOL)
+educ_health_serv$dt <- as.Date(row.names(educ_health_serv))
+educ_health_serv$desc <- 'Education and Health Services'
+
+construction <- as.data.frame(JTS2300JOL) %>% rename(openings = JTS2300JOL)
+construction$dt <- as.Date(row.names(construction))
+construction$desc <- 'Construction'
+
+trade_transport <- as.data.frame(JTS4000JOL) %>% rename(openings = JTS4000JOL)
+trade_transport$dt <- as.Date(row.names(trade_transport))
+trade_transport$desc <- 'Trade, Transportation, and Utilities'
+
+retail_trade <- as.data.frame(JTS4400JOL) %>% rename(openings = JTS4400JOL)
+retail_trade$dt <- as.Date(row.names(retail_trade))
+retail_trade$desc <- 'Retail Trade'
+
+wholesale_trade <- as.data.frame(JTU4200JOL) %>% rename(openings = JTU4200JOL)
+wholesale_trade$dt <- as.Date(row.names(wholesale_trade))
+wholesale_trade$desc <- 'Wholesale Trade'
+
+mining <- as.data.frame(JTU110099JOL) %>% rename(openings = JTU110099JOL)
+mining$dt <- as.Date(row.names(mining))
+mining$desc <- 'Mining and Logging'
+
+allopenings <- rbind(manufacturing,leisure_hosp,accommodation_food,prof_biz_services,
+                     # construction,
+                     mining)
+
+allopenings2 <- allopenings %>% 
+  filter(dt >= "2020-01-01") %>%
+  group_by(desc) %>%
+  mutate(openings_growth = openings/openings[dt=="2020-01-01"])
+
+# Graph Indexed to One Specific Date
+ggplot(allopenings2, aes(x=dt, y=openings_growth, color=desc, group=desc)) +
+  geom_line() +
+  scale_x_date(date_labels = '%Y-%m', date_breaks = '1 month') +
+  wharton_theme +
+  scale_y_continuous(labels=percent) +
+  labs(
+    title = "Job Openings Indexed to January 2020"
+    , x = "Period"
+    , y = "Percent, Seasonally Adjusted"
+    , color = "Industry"
+    , caption = "St. Louis Federal Reserve"
+  ) +
+  theme(
+    legend.position = 'right', 
+    legend.text = element_text(size = 10)
+    #legend.key = element_blank(), 
+    #legend.key.size = unit(1,"cm")
+  ) +
+  x_vertical
+addlogo()
+
+```
+
+Reduced savings and a rising share of household debt relative to income may bring more workers off the sidelines, especially given the expiration of many federal support programs, including enhanced unemployment benefits and more recently the beefed-up child tax credit, which Congress hasn’t extended. 
+
+Geographically, Texas and Arizona have joined Utah and Idaho as the only U.S. states that have recovered all the jobs they lost at the start of the pandemic, driven by population growth, relaxed Covid-19 restrictions, and outsize payroll growth in retail, warehousing, technology and transportation industries, while California and states in the Northeast lag behind.
+
+```{r, results = TRUE, echo = FALSE, warning=FALSE}
+# non-farm payrolls (state level)
+getSymbols.FRED(c('NPPTTL','CANA','TXNA','AZNA','MANA','NYNA','UTNA'), env = .GlobalEnv)
+
+national <- as.data.frame(NPPTTL) %>% rename(nf_payrolls = NPPTTL)
+national$dt <- as.Date(row.names(national))
+national$desc <- 'U.S.'
+
+california <- as.data.frame(CANA) %>% rename(nf_payrolls = CANA)
+california$dt <- as.Date(row.names(california))
+california$desc <- 'California'
+
+texas <- as.data.frame(TXNA) %>% rename(nf_payrolls = TXNA)
+texas$dt <- as.Date(row.names(texas))
+texas$desc <- 'Texas'
+
+arizona <- as.data.frame(AZNA) %>% rename(nf_payrolls = AZNA)
+arizona$dt <- as.Date(row.names(arizona))
+arizona$desc <- 'Arizona'
+
+massachusetts <- as.data.frame(MANA) %>% rename(nf_payrolls = MANA)
+massachusetts$dt <- as.Date(row.names(massachusetts))
+massachusetts$desc <- 'Massachusetts'
+
+newyork <- as.data.frame(NYNA) %>% rename(nf_payrolls = NYNA)
+newyork$dt <- as.Date(row.names(newyork))
+newyork$desc <- 'New York'
+
+utah <- as.data.frame(UTNA) %>% rename(nf_payrolls = UTNA)
+utah$dt <- as.Date(row.names(utah))
+utah$desc <- 'Utah'
+
+allnon_farm <- rbind(national,california,texas,arizona,massachusetts,newyork,utah)
+
+allnon_farm2 <- allnon_farm %>% 
+  filter(dt >= "2020-02-01") %>%
+  group_by(desc) %>%
+  mutate(payroll_return = nf_payrolls/nf_payrolls[dt=="2020-02-01"])
+
+allnon_farm3 <- allnon_farm %>% 
+  filter(dt >= "2019-02-01") %>%
+  group_by(desc) %>%
+  arrange(dt) %>%
+  mutate(payroll_return = (nf_payrolls - lag(nf_payrolls,12))/lag(nf_payrolls,12))
+
+# Graph Indexed to One Specific Date
+ggplot(allnon_farm2, aes(x=dt, y=payroll_return, color=desc, group=desc)) +
+  geom_step() +
+  scale_x_date(date_labels = '%Y-%m', date_breaks = '1 year') +
+  wharton_theme +
+  scale_y_continuous(labels=percent) +
+  labs(
+    title = "Nonfarm Payrolls Indexed to February 2020"
+    , x = "Period"
+    , y = "Percent, Seasonally Adjusted"
+    , color = "State"
+    , caption = "St. Louis Federal Reserve"
+  ) +
+  theme(
+    legend.position = 'right', 
+    legend.text = element_text(size = 10)
+    #legend.key = element_blank(), 
+    #legend.key.size = unit(1,"cm")
+  )
+addlogo()
+
+```
+
+Several additional factors continue to impact the health of small businesses in the U.S. The unemployment rate dropped again last month, helping to bid up wages at a faster pace than before the pandemic, particularly in labor-intensive, in-person industries like leisure and hospitality. 
+
+```{r, results = TRUE, echo = FALSE, warning=FALSE}
+# wage growth (industry level)
+getSymbols.FRED(c('CES0500000003','CES3000000003','CES7000000003',
+                  'CES6000000003','CES6500000003','CES2000000003','CES4000000003', 
+                  'CES4200000003','CES4142000003','CES1000000003'), env = .GlobalEnv)
+
+national <- as.data.frame(CES0500000003) %>% rename(wages = CES0500000003)
+national$dt <- as.Date(row.names(national))
+national$desc <- 'All Industries'
+
+manufacturing <- as.data.frame(CES3000000003) %>% rename(wages = CES3000000003)
+manufacturing$dt <- as.Date(row.names(manufacturing))
+manufacturing$desc <- 'Manufacturing'
+
+leisure_hosp <- as.data.frame(CES7000000003) %>% rename(wages = CES7000000003)
+leisure_hosp$dt <- as.Date(row.names(leisure_hosp))
+leisure_hosp$desc <- 'Leisure and Hospitality'
+
+prof_biz_services <- as.data.frame(CES6000000003) %>% rename(wages = CES6000000003)
+prof_biz_services$dt <- as.Date(row.names(prof_biz_services))
+prof_biz_services$desc <- 'Professional and Business Services'
+
+educ_health_serv <- as.data.frame(CES6500000003) %>% rename(wages = CES6500000003)
+educ_health_serv$dt <- as.Date(row.names(educ_health_serv))
+educ_health_serv$desc <- 'Education and Health Services'
+
+construction <- as.data.frame(CES2000000003) %>% rename(wages = CES2000000003)
+construction$dt <- as.Date(row.names(construction))
+construction$desc <- 'Construction'
+
+trade_transport <- as.data.frame(CES4000000003) %>% rename(wages = CES4000000003)
+trade_transport$dt <- as.Date(row.names(educ_health_serv))
+trade_transport$desc <- 'Trade, Transportation, and Utilities'
+
+retail_trade <- as.data.frame(CES4200000003) %>% rename(wages = CES4200000003)
+retail_trade$dt <- as.Date(row.names(retail_trade))
+retail_trade$desc <- 'Retail Trade'
+
+wholesale_trade <- as.data.frame(CES4142000003) %>% rename(wages = CES4142000003)
+wholesale_trade$dt <- as.Date(row.names(wholesale_trade))
+wholesale_trade$desc <- 'Wholesale Trade'
+
+mining <- as.data.frame(CES1000000003) %>% rename(wages = CES1000000003)
+mining$dt <- as.Date(row.names(mining))
+mining$desc <- 'Mining and Logging'
+
+allwages <- rbind(national,manufacturing,leisure_hosp,prof_biz_services,
+                     # construction,
+                     wholesale_trade,mining)
+
+allwages3 <- allwages %>% 
+  filter(dt >= "2019-01-01") %>%
+  group_by(desc) %>%
+  arrange(dt) %>%
+  mutate(wages_growth = (wages - lag(wages,12))/lag(wages,12))
+
+# Graph Change from One Year Earlier
+ggplot(allwages3%>%filter(dt>="2020-01-01"), aes(x=dt, y=wages_growth, color=desc, group=desc)) +
+  geom_line() +
+  scale_x_date(date_labels = '%Y-%m', date_breaks = '1 year') +
+  wharton_theme +
+  scale_y_continuous(labels=percent) +
+  labs(
+    title = "Average Hourly Wage Change From a Year Earlier"
+    , x = "Period"
+    , y = "Percent, Seasonally Adjusted"
+    , color = "Industry"
+    , caption = "St. Louis Federal Reserve"
+  ) +
+  theme(
+    legend.position = 'right', 
+    legend.text = element_text(size = 10)
+    #legend.key = element_blank(), 
+    #legend.key.size = unit(1,"cm")
+  )
+addlogo()
+
+```
+
+However, inflation rose to its fastest pace in nearly four decades as pandemic-related supply and demand imbalances, along with government stimulus, pushed prices up at a 7% annual rate, outpacing the 4.9% rise in wages. 
+
+
+## Indicators of Recovery
+
+Even as the pandemic shuttered businesses and ruined personal finances, for many, the opposite happened. Shutdowns and unemployment reaching levels not seen since the Great Depression were met with trillions of dollars in government stimulus and the economy’s swift recovery. The first two rounds of stimulus payments lifted 11.7 million people out of poverty, according to the Census Bureau, leaving Americans with $2.7 trillion in extra savings built up. The personal saving rate hit a record 33.8% in April 2020, according to the Bureau of Economic Analysis, up from an average of under 8% for the two years before the pandemic began.
+
+```{r, results = TRUE, echo = FALSE, warning=FALSE}
+# total credit
+dtapath <- "~/python_scripts/git/market_research_jan_2022/credit_data/HHD_C_Report_2021Q3.xlsx"
+credbal <- read_excel(path = dtapath, sheet = "Page 3 Data", skip = 3, col_names = TRUE) %>% rename(timeper=`...1`)
+credbal$timeper2 <- as.yearqtr(sapply(credbal$timeper, dtfmt))
+credmelt <- credbal %>% select(-Total, -timeper) %>% melt(id.vars = c('timeper2'))
+
+ggplot(credmelt, aes(x=timeper2, y=value, fill=variable)) +
+  geom_col() +
+  labs(
+      title = "Total Consumer Debt Balance & Composition"
+    , x = "Year : Quarter"
+    , y = "Outstanding Balance ($ trillion)"
+    , fill = "Debt Type"
+    , caption = "Source: New York Fed Consumer Credit Panel/Equifax"
+  ) +
+  scale_y_continuous(labels=dollar) +
+  wharton_theme + 
+  scale_x_yearqtr(format = '%Y-Q%q') +
+  scale_fill_manual(values = c(wharton_palette[c(4,2)], wharton_palette[1], wharton_palette[c(5,6,7)]))
+addlogo()
+
+```
+
+Across several industries, the average daily balance of business bank accounts have grown since the start of the pandemic, as businesses and consumers alike saved and built up cash buffers to deal with further unexpected events. As a result, the borrower profile has shifted dramatically for those looking to take on new credit. 
+
+```{r, results = TRUE, echo = FALSE, warning=FALSE}
+#new mortgage loans
+newmortgageloans <- read_excel(path = dtapath, sheet = "Page 6 Data", skip = 3, col_names = TRUE) %>% rename(timeper=`...1`) %>% select(1:6)
+names(newmortgageloans) <- c('timeper', '< 620', '620-659', '660-719', '720-759', '760+')
+newmortgageloans$timeper <- as.yearqtr(sapply(newmortgageloans$timeper, dtfmt))
+newmortgageloans <- newmortgageloans %>% melt(id.vars = c('timeper')) %>%
+  group_by(timeper) %>%
+  mutate(
+    pctoftot = value / sum(value)
+  ) %>%
+  ungroup()
+
+# ggplot(newmortgageloans, aes(x=timeper, y=value, fill=variable)) +
+#   geom_col() +
+#   labs(
+#     title = "New Mortgage Originations by Credit Score Range"
+#     , x = "Year : Quarter"
+#     , y = "New Loan Origination ($ billion)"
+#     , fill = "Credit Score"
+#     , caption = "Source: New York Fed Consumer Credit Panel/Equifax"
+#   ) +
+#   scale_y_continuous(labels=dollar) +
+#   wharton_theme + 
+#   scale_x_yearqtr(format = '%Y-Q%q') +
+#   scale_fill_manual(values=wharton_palette[c(1,2,4,5,6,7)]) 
+# addlogo()
+
+
+#loans by fico (100% graph)
+ggplot(newmortgageloans, aes(x=timeper, y=pctoftot, fill=variable)) +
+  geom_col() +
+  labs(
+    title = "New Mortgage Originations - Distribution by Credit Score Range"
+    , x = "Year : Quarter"
+    , y = "% of New Loan Originations"
+    , fill = "Credit Score"
+  ) +
+  scale_y_continuous(labels=percent) +
+  wharton_theme + 
+  scale_fill_manual(values=wharton_palette[c(1,2,4,5,6,7)]) +
+  x_vertical
+
+```
+
+As average credit scores have improved dramatically, so too has the appetite for credit. Applications for small business credit have grown to levels that are now above those seen since before the pandemic.  
+
+Banks are taking notice of improved credit quality. Over the past quarter, bank standards are easing in direct contrast to the early months of the pandemic when lenders tightened loan approval standards in preparation for a large influx of missed payments. With government stimulus and expanded unemployment payments keeping defaults at bay, some 33% of banks reported easing their credit standards during the three months ended October, according to the latest Federal Reserve senior loan officer survey, compared with about 4% a year earlier. This loosening of bank standards, combined with robust bank balances for individuals and small businesses, is a vote of confidence in the health of the U.S. economy and Americans’ finances.
+
+```{r, results = TRUE, echo = FALSE, warning=FALSE}
+#tightening standards graph
+getSymbols.FRED(c('DRTSCLCC', 'STDSAUTO', 'DRTSCIS', 'DRTSCILM', 'DRTSSP', 'SUBLPDRCSC', 'SUBLPDHMSENQ', 'SUBLPDHMSGNQ'), env = .GlobalEnv)
+
+cons <- as.data.frame(DRTSCLCC) %>% rename(pct = DRTSCLCC)
+cons$dt <- as.Date(row.names(cons))
+cons$desc <- 'Consumer Loans & Credit Cards'
+
+auto <- as.data.frame(STDSAUTO) %>% rename(pct = STDSAUTO)
+auto$dt <- as.Date(row.names(auto))
+auto$desc <- 'Auto Loans'
+
+commind <- as.data.frame(DRTSCIS) %>% rename(pct = DRTSCIS)
+commind$dt <- as.Date(row.names(commind))
+commind$desc <- 'Commercial & Industrial Loans to Small Firms'
+
+commind_large <- as.data.frame(DRTSCILM) %>% rename(pct = DRTSCILM)
+commind_large$dt <- as.Date(row.names(commind_large))
+commind_large$desc <- 'Commercial & Industrial Loans to Large & Middle Market Firms'
+
+subprime_mort <- as.data.frame(DRTSSP) %>% rename(pct = DRTSSP)
+subprime_mort$dt <- as.Date(row.names(subprime_mort))
+subprime_mort$desc <- 'Subprime Mortgage Loans'
+
+gse_mort <- as.data.frame(SUBLPDHMSENQ) %>% rename(pct = SUBLPDHMSENQ)
+gse_mort$dt <- as.Date(row.names(gse_mort))
+gse_mort$desc <- 'GSE-Eligible Mortgage Loans'
+
+govt_mort <- as.data.frame(SUBLPDHMSGNQ) %>% rename(pct = SUBLPDHMSGNQ)
+govt_mort$dt <- as.Date(row.names(govt_mort))
+govt_mort$desc <- 'Government Mortgage Loans'
+
+commre_construction <- as.data.frame(SUBLPDRCSC) %>% rename(pct = SUBLPDRCSC)
+commre_construction$dt <- as.Date(row.names(commre_construction))
+commre_construction$desc <- 'Commercial Real Estate Loans for Construction & Land Development'
+
+alldta <- rbind(cons, auto, commind)
+
+ggplot(alldta%>%filter(dt>='2016-01-01'), aes(x=dt, y=pct, color=desc, group=desc)) +
+  geom_line() +
+  scale_x_date(date_labels = '%Y-%m', date_breaks = '1 year') +
+  wharton_theme +
+  labs(
+      title = "Net Percentage of Domestic Banks Tightening Underwriting Standards"
+    , x = "Period (Quarterly, EOQ)"
+    , y = "Percent, Not Seasonally Adjusted"
+    , color = "Loan Type"
+    , caption = "https://fred.stlouisfed.org/series/DRTSCLCC\nhttps://fred.stlouisfed.org/series/STDSAUTO\nhttps://fred.stlouisfed.org/series/DRTSCIS"
+  ) +
+  theme(
+    legend.position = 'bottom', 
+    legend.text = element_text(size = 10)
+    #legend.key = element_blank(), 
+    #legend.key.size = unit(1,"cm")
+  )
+
+```
+
