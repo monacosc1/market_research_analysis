@@ -17,15 +17,15 @@ urlcolor: blue
 ---
 
 ```{r setup, include=FALSE, warning=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.width = 7, fig.height = 4)
+knitr::opts_chunk$set(dev='CairoPDF', message=FALSE, warning=FALSE, echo = FALSE, fig.width = 7, fig.height = 4)
 if(!require("pacman")) install.packages("pacman")
 pacman::p_load(data.table, ggplot2, dplyr, tidyr, quantmod, ggrepel, 
-               reshape2, readxl, scales, gghighlight)
+               reshape2, readxl, scales, gghighlight, cairo_pdf)
 ```
 
 ```{r echo=FALSE, warning=FALSE}
 # load fonts
-source('~/python_scripts/git/market_research_jan_2022/theme/wharton_theme.R')
+source('./theme/wharton_theme.R')
 ```
 
 ```{r echo=FALSE, warning=FALSE}
@@ -68,7 +68,7 @@ ggplot(ueclaims%>%filter(dt>='2021-01-01'), aes(x=dt, y=ICSA, group=1)) +
   scale_y_continuous(labels=comma) +
   wharton_theme +
   geom_hline(aes(yintercept = yintercept, linetype = Lines), line.data)
-addlogo()
+# addlogo()
 
 ```
 
@@ -145,7 +145,7 @@ allopenings2 <- allopenings %>%
 # Graph Indexed to One Specific Date
 ggplot(allopenings2, aes(x=dt, y=openings_growth, color=desc, group=desc)) +
   geom_line() +
-  scale_x_date(date_labels = '%Y-%m', date_breaks = '1 month') +
+  scale_x_date(date_labels = '%Y-%m', date_breaks = '1 year') +
   wharton_theme +
   scale_y_continuous(labels=percent) +
   labs(
@@ -162,7 +162,7 @@ ggplot(allopenings2, aes(x=dt, y=openings_growth, color=desc, group=desc)) +
     #legend.key.size = unit(1,"cm")
   ) +
   x_vertical
-addlogo()
+# addlogo()
 
 ```
 
@@ -234,7 +234,7 @@ ggplot(allnon_farm2, aes(x=dt, y=payroll_return, color=desc, group=desc)) +
     #legend.key = element_blank(), 
     #legend.key.size = unit(1,"cm")
   )
-addlogo()
+# addlogo()
 
 ```
 
@@ -315,7 +315,7 @@ ggplot(allwages3%>%filter(dt>="2020-01-01"), aes(x=dt, y=wages_growth, color=des
     #legend.key = element_blank(), 
     #legend.key.size = unit(1,"cm")
   )
-addlogo()
+# addlogo()
 
 ```
 
@@ -328,7 +328,7 @@ Even as the pandemic shuttered businesses and ruined personal finances, for many
 
 ```{r, results = TRUE, echo = FALSE, warning=FALSE}
 # total credit
-dtapath <- "~/python_scripts/git/market_research_jan_2022/credit_data/HHD_C_Report_2021Q3.xlsx"
+dtapath <- "./credit_data/HHD_C_Report_2021Q3.xlsx"
 credbal <- read_excel(path = dtapath, sheet = "Page 3 Data", skip = 3, col_names = TRUE) %>% rename(timeper=`...1`)
 credbal$timeper2 <- as.yearqtr(sapply(credbal$timeper, dtfmt))
 credmelt <- credbal %>% select(-Total, -timeper) %>% melt(id.vars = c('timeper2'))
@@ -346,7 +346,7 @@ ggplot(credmelt, aes(x=timeper2, y=value, fill=variable)) +
   wharton_theme + 
   scale_x_yearqtr(format = '%Y-Q%q') +
   scale_fill_manual(values = c(wharton_palette[c(4,2)], wharton_palette[1], wharton_palette[c(5,6,7)]))
-addlogo()
+# addlogo()
 
 ```
 
