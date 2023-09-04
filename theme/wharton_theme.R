@@ -48,8 +48,8 @@ wharton_palette <- c('#5064FA', '#08080D', '#001E46', '#01BAEF', '#00F0B4', '#F2
 whapal_02 <- c(wharton_palette[c(1,2,5,7)])
 whapal_21 <- c(wharton_palette[c(1,4,5,6,7,8)])
 
-logo <- image_read("./theme/main-wharton-logo.png")
-logo_dark <- image_read("./theme/main-wharton-logo.png")
+logo <- image_read("../theme/main-wharton-logo.png")
+logo_dark <- image_read("../theme/main-wharton-logo.png")
 
 
 addlogo <- function(){
